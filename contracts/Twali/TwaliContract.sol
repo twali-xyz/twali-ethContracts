@@ -2,15 +2,9 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-// TODO: Flow completion
-// [x] Adding date on initalize 
-// [x] date setting for completion -- not needed transaction is end date 
-// [x] adding date check for completion
-// [x] adding funds to contract and or Safe wallet address
-
-
-contract TwaliContract is Initializable {
+contract TwaliContract is Initializable, ReentrancyGuard {
 
     // string public constant VERSION = "1.0.0";
 
@@ -28,7 +22,7 @@ contract TwaliContract is Initializable {
 
     // Status constant defaultChoice = Status.Draft;
     Status public currentStatus;
-     
+  
     address public owner;
     // expert address that is completion contract and recieving payment
     address public expert;
@@ -38,6 +32,8 @@ contract TwaliContract is Initializable {
     bool public werkApproved;
     // Werk had been paid out 
     bool public werkPaidOut;
+    // Werk was refunded 
+    bool public werkRefunded;
     // contract creation date
     uint creationDate;
     // End date for werk completion 
@@ -46,7 +42,6 @@ contract TwaliContract is Initializable {
 
 
     constructor() initializer{} 
-
 
     /*
     *  Modifiers
@@ -64,30 +59,22 @@ contract TwaliContract is Initializable {
         _;
     }
 
-    // // Transition status
-    // modifier transitionStatus() {
-
-    // }
+ 
 
     // Initilalize Clone contract - only called once in the clonefactory 
     function initialize(
         address _adminClient,
-        address _expert,
         string memory _sowMetaData,
-        bool _werkApproved, // move out and set in the initializer
-        bool _werkPaidOut, // move out and set in the initializer
         uint _creationDate // move out and set in the initializer
     ) public initializer {
         require(!isInitialized, "Contract is already initialized");
         require(owner == address(0), "Can't do that the contract already initialized");
         owner = _adminClient;
-        expert = _expert;
         sowMetaData = _sowMetaData;
-        werkApproved = _werkApproved;
-        werkPaidOut = _werkPaidOut;
+        werkApproved = false;
+        werkPaidOut = false;
         creationDate = _creationDate;
-        currentStatus = Status.Active;
-        // endDate = _endDate;
+        currentStatus = Status.Draft;
         isInitialized = true;
     }
 
@@ -95,7 +82,6 @@ contract TwaliContract is Initializable {
     function getCurrentStatus() public view returns (Status) {
         return currentStatus;
     }
-
 
     // Set end date in days for smaller short term contracts
     function setEndDate_Days(uint numberOfDays) public onlyOwner {
@@ -119,15 +105,18 @@ contract TwaliContract is Initializable {
             // require(msg.value == amount, "Wrong amount sent");
     }
 
-
     // Twali / Admin to apporve submitted Werk 
-    function approveWorkSubmitted() public onlyOwner {
+    function approveWorkSubmitted() public onlyOwner nonReentrant {
         require(werkApproved == false && currentStatus != Status.Complete, "Werk was already apporved");
         require(block.timestamp <= endDate, "Past dealine for approval");
         currentStatus = Status.Complete;
-        // TODO: balance to be paid == payment amount to expert
+        werkApproved = true;
+        
         uint256 balance = address(this).balance;
         payable(expert).transfer(balance);
+        werkPaidOut = true;
+
+        emit ReceivedPayout(expert, balance);
     }
 
     // Expert to get payment post werk completion
@@ -138,7 +127,20 @@ contract TwaliContract is Initializable {
         payable(msg.sender).transfer(balance);
     }
 
+    // [x] - TODO: Add in refund function to Client
+    function refundExpert() public onlyOwner nonReentrant {
+        require(address(this).balance > 0, "No ETH in contract to refund");
+        require(!werkRefunded);
+        require(currentStatus == Status.Active, "Werk was not funded to with withdraw ETH");
+        currentStatus = Status.Killed;
+        uint256 balance = address(this).balance;
+        payable(owner).transfer(balance);
+        werkRefunded = true;
+
+        emit RefundedContract(owner, balance);
+    } 
 
     // Events
-    event Received(address, uint);
+    event ReceivedPayout(address, uint);
+    event RefundedContract(address, uint);
 }
