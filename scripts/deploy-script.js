@@ -7,9 +7,9 @@ const hre = require("hardhat");
 
 async function main() {
   // Grab signer address
-  const accounts = await hre.ethers.getSigners();
+  // const accounts = await hre.ethers.getSigners();
   // console.log("owners address:", accounts[0].address);
-  const owner = accounts[0].address;
+  // const owner = accounts[0].address;
   // Deploy Twali's implementation contract 
   const TwaliImp = await hre.ethers.getContractFactory("TwaliContract");
   const deployedTwaliContract = await TwaliImp.deploy();
@@ -24,8 +24,8 @@ async function main() {
 
   console.log("Twali Clone contract deployed to:", deployedFactory.address);
   // Create test clone contracts with test data
-  await deployedFactory.createTwaliClone(owner, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', "https://bafybeibnikejjgnk6ffixxtltrtmyrdcsijzk37m7lz3nfbu4ilzfmcduq.ipfs.dweb.link/", false, false);
-  await deployedFactory.createTwaliClone(owner, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', "https://bafybeibnikejjgnk6ffixxtltrtmyrdcsijzk37m7lz3nfbu4ilzfmcduq.ipfs.dweb.link/", false, false);
+  // await deployedFactory.createTwaliClone(owner, "https://contract-metadata.s3.amazonaws.com/v1/werkJson.json");
+  // await deployedFactory.createTwaliClone(owner, "https://contract-metadata.s3.amazonaws.com/v1/werkJson.json");
 
   // Returns clone contract addresses
   // const getClones = await deployedFactory.returnContractClones(owner);
