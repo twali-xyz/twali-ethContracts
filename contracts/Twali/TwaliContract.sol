@@ -1,48 +1,52 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 
 contract TwaliContract is Initializable, ReentrancyGuard {
 
     // string public constant VERSION = "1.0.0";
 
+    address public owner;
+    // expert address that is completion contract and recieving payment
+    address public contract_expert;
+    // SOW metadata for work agreed terms 
+    string public contract_sowMetaData;
+
     bool private isInitialized;
-    /*
-    * @notice Contract has four status stages.
-    *   `Draft`: Contract is in draft state awating counter signing event.
-    *   `Active`: Contract active for werk started.
-    *   `Complete`: Contract werk is completed and paided out.
-    *   `Killed`: Contract werk is canceled and no longer active.
-    */
+    // Werk is approved or not approved yet
+    bool public contract_werkApproved; // unassigned variable has default value of 'false'
+    // Werk has been paid out 
+    bool public contract_werkPaidOut;
+    // Werk was refunded 
+    bool public contract_werkRefunded;
+    // contract creation date
+    uint contract_created_on;
+    // experts start date in contract
+    uint public contract_start_date;
+    // End date for werk completion 
+    uint public contract_end_date;
+    // Completion Date for submitted werk
+    // contract amount 
+    uint256 public contract_payment_amount = 0.0 ether;
+
+    /// @notice This contract has four 'status' stages that transitions through in a full contract cycle.
+    /// Draft: Contract is in draft stage awaiting for applications and selection.
+    /// Active: Contract is active and funded with pay out amount with a selected Contract Expert to complete werk.
+    /// Complete: Contract werk is completed, approved by client, and Expert has recieved payment.
+    /// Killed: Contract werk is canceled in draft stage or no longer active and client is refunded.
     enum Status { 
         Draft, Active, Complete, Killed
     }
 
-    Status public currentStatus;
+    /// @notice Functions cannot be called at this time because it has passed or not in the correct stage.
+    ///
+    error FunctionInvalidWithCurrentStatus();
+    /// @dev Status: This is a contracts current stage upon creation.
+    Status public contract_currentStatus = Status.Draft;
   
-    address public owner;
-    // expert address that is completion contract and recieving payment
-    address public expert;
-    // SOW metadata for work agreed terms 
-    string public sowMetaData;
-    // Werk is approved or not approved yet
-    bool public werkApproved;
-    // Werk has been paid out 
-    bool public werkPaidOut;
-    // Werk was refunded 
-    bool public werkRefunded;
-    // Approval if expert can withdraw from contract
-    bool expertWithdraw;
-    // contract creation date
-    uint creationDate;
-    // experts start date in contract
-    uint public startDate;
-    // End date for werk completion 
-    uint public endDate;
-    // contract amount 
-    uint256 public werkPaymountAmount = 0.0 ether;
 
 
     constructor() initializer{} 
@@ -51,25 +55,66 @@ contract TwaliContract is Initializable, ReentrancyGuard {
     *  Modifiers
     */ 
 
-    // handling Owner only function calls
+    /// @notice onlyOwner(): This is added to selected function calls to check and ensure only the 'owner'(client) of the contract is calling the selected function.
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
+        require(
+            msg.sender == owner, 
+            "Only owner can call this function"
+            );
         _;
     }
 
-    // validates if expert can widtdraw from contract
-    modifier validateExpertWithdraw() {
-        require(expertWithdraw == true, "Not approved to widthdraw from contract");
+    /// @notice IsExpert(): This checks that the address being used it the expert address that is activated in the contract.
+    modifier isExpert(
+        address _expert
+    ) {
+        require(_expert == contract_expert, "Not contract expert address");
         _;
     }
 
-    // hanlding expert function calls
-    modifier onlyExpert() {
-        require(msg.sender == expert, "Only the Expert can call this function");
+    /// @notice isValid(): This checks that an address being passed into a function is a valid address.
+    /// @dev isValid(): Can be used in any function call that passes in a address that is not the contract owner.
+    /// @param _addr: is address string.
+    modifier isValid(address _addr) {
+        require(_addr != address(0), "Not a valid address");
         _;
     }
- 
-    // @dev initilalize() creates a clone contract in the clone factory
+
+    /// @notice isStatus(): This is added to function calls can be called at certain stages,(e.g., only being able to call functions for 'Active' stage).
+    /// @dev isStatus(): This is checking concurrently that a function call is being called at it's appropriate set stage order.
+    /// @param _contract_currentStatus is setting the appropriate stage as a parameter check to function call.
+    modifier isStatus(Status _contract_currentStatus) {
+        if (contract_currentStatus != _contract_currentStatus)
+            revert FunctionInvalidWithCurrentStatus();
+        _;
+    }
+
+
+    modifier werkNotPaid() {
+        require(contract_werkPaidOut != true, "Werk already paid out!");
+        _;
+    }
+
+
+    modifier werkNotApproved() {
+        require(contract_werkApproved != true, "Werk already approved!");
+        _;
+    }
+
+    modifier isNotRefunded() {
+        require(contract_werkRefunded != true, "Refunded already!");
+        _;
+    }
+
+    /// @notice This is added to a function and once it is completed it will then move the contract to its next stage.
+    /// @dev setNextStage(): Use's the function 'nextStage()' to transition to contracts next stage with one increment.
+    modifier setNextStage() {
+        _;
+        nextStage();
+    }
+
+
+    // @dev initialize(): This creates a clone contract in the TwaliCloneFactory.sol contract.
     // @param _adminClient the address of the contract owner/admin who is the acting client
     // @param _sowMetaData Scope of work of the contract as a IPFS string
     // @param _creationDate is passed in from clone factory as new contract is created
@@ -81,117 +126,147 @@ contract TwaliContract is Initializable, ReentrancyGuard {
         require(!isInitialized, "Contract is already initialized");
         require(owner == address(0), "Can't do that the contract already initialized");
         owner = _adminClient;
-        sowMetaData = _sowMetaData;
-        werkApproved = false;
-        werkPaidOut = false;
-        creationDate = _creationDate;
-        currentStatus = Status.Draft;
+        contract_sowMetaData = _sowMetaData;
+        contract_werkApproved = false;
+        contract_werkPaidOut = false;
+        contract_created_on = _creationDate;
+        contract_currentStatus = Status.Draft;
         isInitialized = true;
     }
 
     // Get status of contract 
     function getCurrentStatus() public view returns (Status) {
-        return currentStatus;
+        return contract_currentStatus;
     }
 
-     // Returns balance of contract
+     // @dev getBalance(): Simple get function that returns balance of contract.
     function getBalance() public view returns (uint256) {
         return address(this).balance;
+    }
+
+    // Refunds payment to Owner / Client of Contract
+    // @dev refundClient():  
+    function refundClient() 
+        internal 
+    {
+        uint256 balance = address(this).balance;
+        contract_payment_amount = 0;
+        payable(owner).transfer(balance);
+        contract_werkRefunded = true;
+
+        emit RefundedPayment(owner, balance);
+    }
+
+    function nextStage() internal {
+        contract_currentStatus = Status(uint(contract_currentStatus)+1);
     }
 
     // Set end date in days for smaller short term contracts
     // @param numberOfDays is passed in to set a short length contract
     function setEndDate_Days(uint numberOfDays) internal {
         // require(now >= creationDate , "");
-        endDate = startDate + (numberOfDays * 1 days);
+        contract_end_date = contract_start_date + (numberOfDays * 1 days);
     }
 
     // Set end date in weeks for longer term contracts
     // UTC 0 -- Unix
     // @param numberOfWeeks is passed in to set a longer term contract
     function setEndDate_Weeks(uint numberOfWeeks) internal {
-        endDate = startDate + (numberOfWeeks * 1 weeks);
+        contract_end_date = contract_start_date + (numberOfWeeks * 1 weeks);
     }
 
-    function setContractPayout(uint256 _werkPaymountAmount) internal {
-        werkPaymountAmount = _werkPaymountAmount;
+    function setContractPayout(uint256 _contract_payment_amount) internal {
+        contract_payment_amount = _contract_payment_amount;
     }
 
-    // Deposit funds to contract for Expert to be paid (escrow form of contract)
-    function depositExpertPayment() public payable onlyOwner {
-        require(werkPaymountAmount <= msg.value, "Wrong amount of ETH sent");
+    // Set Contract inactive 'killed'
+    // @notice This will set a 'draft' contract to 'killed' stage if the contract needs to be closed.
+    function killDraftContract() 
+        external 
+        onlyOwner
+        isStatus(Status.Draft)
+    {
+
+        contract_currentStatus = Status.Killed;
+    }
+
+        // Deposit funds to contract for Expert to be paid (escrow form of contract)
+    function depositExpertPayment(uint _amount) public payable {
+        require(_amount <= msg.value, "Wrong amount of ETH sent");
 
         emit DepoistedExpertPaynment(msg.sender, msg.value);
     }
 
-    // @dev Add's Expert and activates Contract
-    // @param _expert address of who is completing werk and reciving payment for werk completed
+    // @dev activateContract(): Add's Expert and activates Contract
+    // @param _contract_expert is the address of who is completing werk and receiving payment for werk completed.
     // @param _numberOfDays is passed in with approved expert to set an enddate estimation
-    function activateContract(address _expert, uint _numberOfDays, uint256 _werkPaymountAmount) external onlyOwner {
-            require(_expert != address(0), "Can't do that");
-            require(currentStatus == Status.Draft, "Contract already activated");
-            expert = _expert;
-            startDate = block.timestamp;
-            setEndDate_Days(_numberOfDays);
-            werkPaymountAmount = _werkPaymountAmount;
+    function activateContract(
+        address _contract_expert, 
+        uint _numberOfDays, 
+        uint256 _contract_payment_amount)
+        external
+        payable 
+        onlyOwner
+        isValid(_contract_expert)
+        isStatus(Status.Draft)
+        setNextStage 
+    { 
+        contract_expert = _contract_expert;
+        contract_start_date = block.timestamp;
+        setEndDate_Days(_numberOfDays);
+        contract_payment_amount = _contract_payment_amount;
+        depositExpertPayment(_contract_payment_amount);
     
-            emit ContractActivated(expert, startDate);
+
+        emit ContractActivated(contract_expert, 
+                               contract_start_date, 
+                               contract_payment_amount);
     }
 
-    // Approve Expert to widtdraw from Contract
-    function approveExpertWithdraw() external onlyOwner {
-        require(expertWithdraw == false, "Withdraw already");
-        expertWithdraw = true;
+    // @notice Sets an active contract to 'killed' stage and refunds ETH in contract to the client, who is the set contract 'owner'.
+    // @dev killActiveContract(): 
+
+    function killActiveContract() 
+        external 
+        onlyOwner
+        isNotRefunded 
+        nonReentrant 
+        isStatus(Status.Active) 
+    {
+        contract_currentStatus = Status.Killed;
+        refundClient();
     }
 
     // Twali / Admin to apporve submitted Werk 
-    function approveWorkSubmitted() public onlyOwner nonReentrant {
-        require(werkApproved == false && currentStatus != Status.Complete, "Werk was already apporved");
-        require(block.timestamp <= endDate, "Past dealine for approval");
-        currentStatus = Status.Complete;
-        werkApproved = true;
+    function approveWorkSubmitted() 
+        public 
+        onlyOwner
+        werkNotApproved
+        werkNotPaid
+        isStatus(Status.Active) 
+        nonReentrant
+        setNextStage 
+    {
+        // contract_currentStatus = Status.Complete;
+        contract_werkApproved = true;
         uint256 balance = address(this).balance;
-        werkPaymountAmount = 0;
-        payable(expert).transfer(balance);
-        werkPaidOut = true;
+        contract_payment_amount = 0;
+        payable(contract_expert).transfer(balance);
+        contract_werkPaidOut = true;
 
-        emit ReceivedPayout(expert, balance);
+        emit ReceivedPayout(contract_expert, 
+                            balance, 
+                            contract_werkPaidOut, 
+                            contract_werkApproved);
     }
 
-    // Expert to get payment post werk completion
-    function getPayment() public validateExpertWithdraw onlyExpert {
-        require(currentStatus == Status.Complete, "Werk is not completed to withdraw funds");
-        currentStatus = Status.Complete;
-        uint256 balance = address(this).balance;
-        payable(msg.sender).transfer(balance);
-    }
-
-    // Refunds payment to Owner / Client of Contract 
-    function refundClient() external onlyOwner nonReentrant {
-        require(address(this).balance > 0, "No ETH in contract to refund");
-        require(!werkRefunded);
-        require(currentStatus != Status.Active, "Werk was not funded to with withdraw ETH");
-        currentStatus = Status.Killed;
-        uint256 balance = address(this).balance;
-        werkPaymountAmount = 0;
-        payable(owner).transfer(balance);
-        werkRefunded = true;
-
-        emit RefundedContract(owner, balance);
-    }
-
-    // Set Contract inactive 'killed'
-    function killContract() external onlyOwner {
-        require(address(this).balance == 0, "ETH still in contract can not kill contract");
-        currentStatus = Status.Killed;
-    }
 
     fallback() external payable{}
 
     receive() external payable{}
     // Events
-    event ReceivedPayout(address, uint);
-    event RefundedContract(address, uint);
-    event ContractActivated(address, uint);
+    event ReceivedPayout(address, uint, bool, bool);
+    event RefundedPayment(address, uint);
+    event ContractActivated(address, uint, uint);
     event DepoistedExpertPaynment(address, uint);
 }
