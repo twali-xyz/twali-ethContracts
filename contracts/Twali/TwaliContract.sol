@@ -48,11 +48,11 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";                                                                                                                                                                                                    
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+                                                                                                                                                                                            
 
 contract TwaliContract is Initializable, ReentrancyGuard {
-
-    
+  
     address public owner;
     // expert address that is completion contract and recieving payment
     address payable public contract_expert;
@@ -73,7 +73,7 @@ contract TwaliContract is Initializable, ReentrancyGuard {
     // End date for werk completion 
     uint public contract_end_date;
     // Completion Date for submitted werk
-    // contract amount 
+    // Contract amount to be paid 
     uint256 public contract_payment_amount = 0.0 ether;
 
     /// @notice This contract has four 'status' stages that transitions through in a full contract cycle.
@@ -85,11 +85,11 @@ contract TwaliContract is Initializable, ReentrancyGuard {
         Draft, Active, Complete, Killed
     }
 
-    /// @dev Status: Contract is set to default stauts of 'Draft' on creation.
+    /// @dev Status: Contract is set to default status of 'Draft' on contract creation.
     Status private contract_currentStatus;
   
     // Events
-    event ReceivedPayout(address, uint, bool, bool);
+    event ReceivedPayout(address, bool, bool);
     event RefundedPayment(address, uint);
     event ContractActivated(address, uint, uint);
     event DepoistedExpertPaynment(address, uint);
@@ -99,7 +99,36 @@ contract TwaliContract is Initializable, ReentrancyGuard {
     error InvalidCurrentStatus();
 
 
-    constructor() initializer{} 
+    /// Execute on a call to contract if no other functions match given function signature.
+    fallback() external payable{}
+
+
+    receive() external payable{}
+
+
+    /// @notice This initializer replaces the constructor to is the base input data for a new contract clone instances .
+    /// @dev initialize(): Is also called within the clone contract in TwaliCloneFactory.sol.
+    /// @param _adminClient the address of the contract owner who is the acting client.
+    /// @param _sowMetaData Scope of work of the contract as a URI string.
+    /// @param _creationDate is passed in from clone factory as the new contract is created.
+    function initialize(
+        address _adminClient,
+        string memory _sowMetaData,
+        uint _contract_payment_amount,
+        uint _contract_start_date,
+        uint _contract_end_date,
+        uint _creationDate
+    ) public initializer {
+        require(!isInitialized, "Contract is already initialized");
+        require(owner == address(0), "Can't do that the contract already initialized");
+        owner = _adminClient;
+        contract_sowMetaData = _sowMetaData;
+        contract_payment_amount = _contract_payment_amount;
+        contract_start_date = _contract_start_date;
+        contract_end_date = _contract_end_date;
+        contract_created_on = _creationDate;
+        isInitialized = true;
+    }
 
     /*
     *  Modifiers
@@ -164,32 +193,7 @@ contract TwaliContract is Initializable, ReentrancyGuard {
         nextStage();
     }
 
-    /// @notice This initializer is the base data for a new contract instance.
-    /// @dev initialize(): Is also called within the clone contract in TwaliCloneFactory.sol.
-    /// @param _adminClient the address of the contract owner who is the acting client.
-    /// @param _sowMetaData Scope of work of the contract as a URI string.
-    /// @param _creationDate is passed in from clone factory as the new contract is created.
-    function initialize(
-        address _adminClient,
-        string memory _sowMetaData,
-        uint _contract_payment_amount,
-        uint _contract_start_date,
-        uint _contract_end_date,
-        uint _creationDate
-    ) public initializer {
-        require(!isInitialized, "Contract is already initialized");
-        require(owner == address(0), "Can't do that the contract already initialized");
-        owner = _adminClient;
-        contract_sowMetaData = _sowMetaData;
-        contract_payment_amount = _contract_payment_amount;
-        contract_start_date = _contract_start_date;
-        contract_end_date = _contract_end_date;
-        contract_created_on = _creationDate;
-        // contract_currentStatus = Status.Draft;
-        // contract_werkApproved = false;
-        // contract_werkPaidOut = false;
-        isInitialized = true;
-    }
+
 
     /// @notice Gets the current status of contract.
     function getCurrentStatus() public view returns (Status) {
@@ -206,12 +210,11 @@ contract TwaliContract is Initializable, ReentrancyGuard {
     function refundClient() 
         internal 
     {
+        contract_werkRefunded = true;
+        emit RefundedPayment(owner, contract_payment_amount);
         uint256 balance = address(this).balance;
         contract_payment_amount = 0;
         payable(owner).transfer(balance);
-        contract_werkRefunded = true;
-
-        emit RefundedPayment(owner, balance);
     }
 
     /// @dev This is the stage transition in the 'setNextStage' modifier.
@@ -284,21 +287,13 @@ contract TwaliContract is Initializable, ReentrancyGuard {
     {
         contract_werkApproved = true;
         contract_werkPaidOut = true;
-        uint256 balance = address(this).balance;
-        contract_expert.transfer(balance);
-        
-
         emit ReceivedPayout(contract_expert, 
-                            balance, 
                             contract_werkPaidOut, 
                             contract_werkApproved);
+                            
+        uint256 balance = address(this).balance;
+        contract_expert.transfer(balance);     
     }
 
-
-    fallback() external payable{}
-    receive() external payable{}
-  
 }
-
-
 
