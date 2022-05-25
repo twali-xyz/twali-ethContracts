@@ -2,7 +2,6 @@
 
 Contract Version - `1.0`
 
-
 This documentation gives a general layout and insight to the contracts state, naming conventions, and functional actions that can be preformed.
 
 
@@ -33,17 +32,13 @@ The actions that can be preformed within the contract and who can interact with 
 - **Open Public View** can `Read` the defined state variables defined above in ***Contract State Naming Conventions**.
 
 
+## Contract Deployment Details
 
- demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+Twali's contract can be viewd on both Ethereum's Network `Mainnet` & `Rinkeby Testnet`.
 
-Try running some of the following tasks:
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
-```
+- Mainnet, `TwaliContract` contract is deployed at `0x89F891cc3D8cdfe76D6dd67bbbaE00DBf52457Fa`.
+- Mainent, `TwaliContract` contract is deployed at `0xD45C62150aDF02ab213274569443CaEe320866fA`.
+
+- Rinkeby, **TO BE ADDED**
+- Rinkeby, **TO BE ADDED**

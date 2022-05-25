@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-
 // Implmenentation Contract import -- Twali's Base
 import "./TwaliContract.sol";
 
@@ -11,32 +10,44 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TwaliContractFactory is Ownable {
 
-        // address public immutable ADMIN_ADDRESS;
-        // Implementation contract
+        /// Implementation contract address
         address public contractImplementation;
-        // Mapping of all clone deployments
+        /// Mapping of all clone deployments
         mapping(address => address[]) public cloneContracts;
 
-        // Event trigger when new contract clone created
+        /// Event trigger when new a contract clone is created
         event TwaliCloneCreated(address cloneAddress, address contractImplementation);
 
         constructor(address _contractImplementation) {
                 contractImplementation = _contractImplementation;
-                // ADMIN_ADDRESS = msg.sender;
         }
 
-        // Creates a contract clone of the Logic `Implementation` Contract
-        function createTwaliClone(string memory _sowMetaData) external onlyOwner {
+        // @dev Creates a contract clone of the Logic Implementation TwaliContract.sol.
+        // @param - Initialized with (Contract Owner, SOW metadata URI, contract payment amount, start date, end date, timestamp it was created)
+        function createTwaliClone(
+                string memory _sowMetaData,
+                uint _contract_payment_amount,
+                uint _contract_start_date,
+                uint _contract_end_date
+                ) 
+                external 
+                onlyOwner 
+        {
                 // require(msg.sender == owner, "Only admin of Twali can clone contract");
                 address payable clone = payable(Clones.clone(contractImplementation));
                 
-                // Contract Initialized with admin address (Twali, SOW metadata URI, timestamp it was created)
-                TwaliContract(clone).initialize(owner(), _sowMetaData, block.timestamp);
+                TwaliContract(clone).initialize(owner(),
+                                                _sowMetaData,
+                                                _contract_payment_amount,
+                                                _contract_start_date,
+                                                _contract_end_date,
+                                                block.timestamp);
+
                 cloneContracts[msg.sender].push(clone);
                 emit TwaliCloneCreated(clone, contractImplementation);
         }
 
-        // Return all created Clone contracrts
+        /// @param _admin address is setReturn all created Clone contracrts
         function returnContractClones(address _admin) external view returns (address[] memory){
                 return cloneContracts[_admin];
         }
