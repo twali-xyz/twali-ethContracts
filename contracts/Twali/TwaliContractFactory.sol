@@ -15,9 +15,6 @@ contract TwaliContractFactory is Ownable {
         /// Mapping of all clone deployments
         mapping(address => address[]) public cloneContracts;
 
-        /// Event trigger when new a contract clone is created
-        event TwaliCloneCreated(address cloneAddress, address contractImplementation);
-
         constructor(address _contractImplementation) {
                 contractImplementation = _contractImplementation;
         }
@@ -33,7 +30,7 @@ contract TwaliContractFactory is Ownable {
                 external 
                 onlyOwner 
         {
-                // require(msg.sender == owner, "Only admin of Twali can clone contract");
+
                 address payable clone = payable(Clones.clone(contractImplementation));
                 
                 TwaliContract(clone).initialize(owner(),
@@ -44,7 +41,6 @@ contract TwaliContractFactory is Ownable {
                                                 block.timestamp);
 
                 cloneContracts[msg.sender].push(clone);
-                emit TwaliCloneCreated(clone, contractImplementation);
         }
 
         /// @param _admin address is setReturn all created Clone contracrts
