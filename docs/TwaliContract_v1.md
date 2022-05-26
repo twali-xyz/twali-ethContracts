@@ -38,7 +38,7 @@ Twali's contract can be viewd on both Ethereum's Network `Mainnet` & `Rinkeby Te
 
 
 - Mainnet, `TwaliContract` contract is deployed at `0x89F891cc3D8cdfe76D6dd67bbbaE00DBf52457Fa`.
-- Mainent, `TwaliContract` contract is deployed at `0xD45C62150aDF02ab213274569443CaEe320866fA`.
+- Mainent, `TwaliCloneContract` contract is deployed at `0xD45C62150aDF02ab213274569443CaEe320866fA`.
 
-- Rinkeby, **TO BE ADDED**
-- Rinkeby, **TO BE ADDED**
+- Rinkeby, `TwaliContract` contract is deployed at [0x9FaeE1817cDD6282a090bA4b084672e4C8402a5F](https://rinkeby.etherscan.io/address/0x9FaeE1817cDD6282a090bA4b084672e4C8402a5F#code).
+- Rinkeby, `TwaliCloneContract` contract is deployed at [0xD31766Bba01E3cAA21D8eb2Db8830C78940Feb26](https://rinkeby.etherscan.io/address/0xD31766Bba01E3cAA21D8eb2Db8830C78940Feb26#code)
