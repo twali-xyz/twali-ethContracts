@@ -32,7 +32,7 @@ async function main() {
   const getClones = await deployedFactory.returnContractClones(owner);
   console.log("Contract Clones created:", getClones);
 
-  // // // Example getting a clone Contract by its address
+  // Example getting a clone Contract by its address
   const clone1 = await hre.ethers.getContractAt("TwaliContract", getClones[0]);
 
   const metaData = await clone1.contract_sowMetaData();
